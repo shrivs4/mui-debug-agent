@@ -1,9 +1,8 @@
 import json
-from unittest import result
 from embed_util import embed_text
 import chromadb
 
-chroma_client = chromadb.Client()
+chroma_client = chromadb.PersistentClient(path="./chroma_db")
 
 collection = chroma_client.get_or_create_collection(name="MUIIssueDoc")
 
@@ -40,6 +39,6 @@ When rapidly refreshing the page in dark mode, the Material UI circular progress
 
 query_vector = embed_text(query)
 
-result = collection.query(query_embeddings=query_vector, n_results=3)
+result = collection.query(query_embeddings=[query_vector], n_results=3)
 
 print(result)
