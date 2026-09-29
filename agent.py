@@ -63,10 +63,13 @@ tools = [
 
 required_tools = {"search_issues": search_issues, "search_web": search_web}
 
-messages_list = []
+histories = {}
 
 
-def call_claude(query):
+def call_claude(query, conversation_id):
+    if conversation_id not in histories:
+        histories[conversation_id] = []
+    messages_list = histories[conversation_id]
     messages_list.append({"role": "user", "content": query})
     response = claude_client.messages.create(
         model="claude-sonnet-4-5",
@@ -113,8 +116,3 @@ def call_claude(query):
         attempt += 1
     messages_list.append({"role": "assistant", "content": final_response.content})
     return final_response.content[0].text
-
-
-user_question = "What is the latest stable version of MUI Material and what were the breaking changes in it?"
-print(call_claude(user_question))
-print(call_claude("what file should I change?"))
