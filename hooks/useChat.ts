@@ -29,9 +29,15 @@ export function useChat(): UseChatReturn {
   const [isSlow, setIsSlow] = useState(false);
   const [conversationId, setConversationId] = useState(() => newId());
   const slowTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const abortRef = useRef<AbortController | null>(null);
 
   const fetchAnswer = useCallback(
     async (question: string) => {
+      // Cancel any in-flight request from a previous chat
+      abortRef.current?.abort();
+      const controller = new AbortController();
+      abortRef.current = controller;
+
       setIsLoading(true);
       setIsSlow(false);
 
@@ -42,9 +48,20 @@ export function useChat(): UseChatReturn {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ question, conversation_id: conversationId }),
+          signal: controller.signal,
         });
 
-        const data = await res.json();
+        // Ignore if this request was aborted (e.g. newChat was clicked)
+        if (controller.signal.aborted) return;
+
+        let data: { answer?: string; error?: string };
+        const contentType = res.headers.get('content-type') ?? '';
+        if (contentType.includes('application/json')) {
+          data = await res.json();
+        } else {
+          // Non-JSON body (e.g. Vercel 504 HTML page)
+          data = { error: 'The server took too long to respond — please retry.' };
+        }
 
         if (!res.ok || data.error) {
           setMessages((prev) => [
@@ -59,10 +76,11 @@ export function useChat(): UseChatReturn {
         } else {
           setMessages((prev) => [
             ...prev,
-            { id: newId(), role: 'assistant', content: data.answer },
+            { id: newId(), role: 'assistant', content: data.answer! },
           ]);
         }
       } catch {
+        if (controller.signal.aborted) return;
         setMessages((prev) => [
           ...prev,
           {
@@ -73,6 +91,7 @@ export function useChat(): UseChatReturn {
           },
         ]);
       } finally {
+        if (controller.signal.aborted) return;
         if (slowTimerRef.current) clearTimeout(slowTimerRef.current);
         setIsLoading(false);
         setIsSlow(false);
@@ -107,6 +126,7 @@ export function useChat(): UseChatReturn {
   );
 
   const newChat = useCallback(() => {
+    abortRef.current?.abort();
     if (slowTimerRef.current) clearTimeout(slowTimerRef.current);
     setMessages([]);
     setIsLoading(false);
