@@ -10,6 +10,11 @@ class Question(BaseModel):
     conversation_id: str
 
 
+@app.get("/")
+def health_check():
+    return {"status": "ok"}
+
+
 @app.post("/ask")
 def ask(body: Question):
     question = body.question
