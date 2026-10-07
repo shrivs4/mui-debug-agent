@@ -1,18 +1,18 @@
 # MUI Debug Agent — Frontend
 
-Chat interface for the [MUI Debug Agent](https://github.com/shrivs4/mui-debug-agent): describe a
-Material UI bug or paste an error, and the agent answers with a fix grounded in real resolved
-GitHub issues and current docs.
+Chat interface for the MUI Debug Agent: describe a Material UI bug or paste an error, and the
+agent answers with a fix grounded in real resolved GitHub issues and current docs.
 
-**Live demo:** [mui-debug-fe.vercel.app](https://mui-debug-fe.vercel.app/) · **Backend repo:** [shrivs4/mui-debug-agent](https://github.com/shrivs4/mui-debug-agent)
+**Live demo:** [mui-debug-fe.vercel.app](https://mui-debug-fe.vercel.app/)
 
-The agent itself — tools, retrieval, memory, and design decisions — is documented in the
-[backend README](https://github.com/shrivs4/mui-debug-agent#readme). This repo is the UI layer.
+This folder is the UI layer of a monorepo. The agent itself — tools, retrieval, memory, and
+design decisions — is documented in the [main README](../README.md), and its code is in
+[`../backend`](../backend).
 
 ## How it works
 
 ```
-Browser → /api/ask (Next.js route, server-side) → FastAPI backend on Render → Claude agent
+Browser → /api/ask (Next.js route, server-side) → FastAPI backend → Claude agent
 ```
 
 The browser never calls the backend directly. The Next.js route handler forwards each request
@@ -34,24 +34,57 @@ is one place to add auth or rate limiting later.
 - **Errors are visible and retryable.** Failures show in the thread with a Retry button that
   re-sends without duplicating the user's message. If the platform returns a non-JSON timeout
   page, the UI says the server took too long rather than showing a generic network error.
+- **Fails loudly when misconfigured.** If `BACKEND_URL` is missing, the route returns a clear
+  500 ("BACKEND_URL is not configured") instead of guessing a URL.
 - **All request logic lives in one hook** (`hooks/useChat.ts`), so streaming can be added
   later without touching the components.
 
 ## Run locally
 
+**Whole stack (recommended):** from the repo root, `docker compose up --build` — see the
+[main README](../README.md#quick-start-full-stack-docker).
+
+**Frontend only, with the dev server:**
+
 ```bash
+cd frontend
 npm install
-echo "BACKEND_URL=https://mui-debug-agent.onrender.com" > .env.local
+echo "BACKEND_URL=http://localhost:8000" > .env.local
 npm run dev
 ```
 
-Open http://localhost:3000. To use a local backend instead, set
-`BACKEND_URL=http://127.0.0.1:8000` (no trailing slash).
+Open http://localhost:3000. `BACKEND_URL` depends on where the frontend runs (no trailing
+slash):
+
+| Frontend runs… | `BACKEND_URL` |
+|---|---|
+| On your machine (`npm run dev`), backend local | `http://localhost:8000` |
+| In Docker Compose | `http://backend:8000` (set in `docker-compose.yml`) |
+| On Vercel | the deployed backend's URL |
+
+Inside a container, `localhost` means that container itself, which is why Compose uses the
+service name instead.
+
+## Docker image
+
+`Dockerfile` is a three-stage build:
+
+1. **deps** — `npm ci` from the lockfile only, so this layer is cached until dependencies change.
+2. **builder** — copies `node_modules` from `deps`, adds the source, runs `npm run build`.
+3. **runner** — a fresh `node:20-alpine` that copies only the build output:
+   `.next/standalone` (from `output: "standalone"` in `next.config.ts`), `.next/static` and
+   `public/`, then runs `node server.js` with `HOSTNAME=0.0.0.0`.
+
+Only the last stage ships: the builder image is **1.16 GB**, the final image **289 MB**.
+Build tools and source code never reach the runtime image. `.dockerignore` keeps local
+`node_modules`, `.next` and every `.env*` file out of the build context.
 
 ## Deployment
 
-Deployed on Vercel. The only environment variable is `BACKEND_URL` (server-side; no
-`NEXT_PUBLIC_` prefix, so it never reaches the browser).
+Deployed on Vercel from this monorepo with *Root Directory* set to `frontend`. Vercel builds
+Next.js its own way, so the Dockerfile and `output: "standalone"` don't affect it. The only
+environment variable is `BACKEND_URL` (server-side; no `NEXT_PUBLIC_` prefix, so it never
+reaches the browser).
 
 ## Files
 
@@ -63,7 +96,9 @@ Deployed on Vercel. The only environment variable is `BACKEND_URL` (server-side;
 | `components/ChatMessage.tsx` | User, assistant (Markdown) and error messages |
 | `components/TypingIndicator.tsx` | Typing dots and the "waking the server" notice |
 | `components/EmptyState.tsx` | Clickable example questions |
+| `Dockerfile` / `.dockerignore` | Multi-stage production image for local and Compose use |
 
-**Stack:** Next.js 16 (App Router) · React 19 · TypeScript · Tailwind CSS v4 · react-markdown · Vercel
+**Stack:** Next.js 16 (App Router) · React 19 · TypeScript · Tailwind CSS v4 · react-markdown ·
+Docker · Vercel
 
 The UI was built with AI assistance (Claude Code), reviewed and corrected by me.

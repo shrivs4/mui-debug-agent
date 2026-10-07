@@ -1,12 +1,44 @@
-# MUI Debug Agent — Backend
+# MUI Debug Agent
 
 An AI agent that debugs Material UI (MUI) problems. Describe a bug or paste an error, and it
 finds how similar issues were actually resolved and returns a concrete fix.
 
-**Live demo:** [mui-debug-fe.vercel.app](https://mui-debug-fe.vercel.app/) · **Frontend repo:** [shrivs4/mui-debug-fe](https://github.com/shrivs4/mui-debug-fe)
+**Live demo:** [mui-debug-fe.vercel.app](https://mui-debug-fe.vercel.app/)
 
 > The backend runs on Render's free tier and sleeps when idle, so the first request after a
 > quiet period can take up to a minute.
+
+## Repository layout
+
+This is a monorepo: the agent backend and the chat UI live side by side and run together with
+one command.
+
+```
+.
+├── backend/              FastAPI service + Claude tool-use agent (deployed on Render)
+├── frontend/             Next.js chat UI (deployed on Vercel) — see frontend/README.md
+└── docker-compose.yml    Runs the whole stack locally
+```
+
+## Quick start (full stack, Docker)
+
+Requires Docker. Create `backend/.env` with three API keys (no quotes around values):
+
+```
+ANTHROPIC_API_KEY=...
+OPENAI_API_KEY=...
+TAVILY_API_KEY=...
+```
+
+Then, from the repo root:
+
+```bash
+docker compose up --build
+```
+
+Open http://localhost:3000. Compose builds both images, starts both containers on a shared
+network, and points the frontend at the backend by service name (`http://backend:8000`).
+Logs from both services stream into the same terminal.
 
 ## What it does
 
@@ -77,6 +109,13 @@ Claude picks a tool based only on its description, so the wording decides the ro
 following up on pull-request links. In production logs, a how-to question went straight to
 `search_web` and a bug report went to `search_issues`.
 
+**7. One repo, one command locally; each service on the platform that suits it.**
+Backend and frontend share a repo so a change that touches both lands in one commit, and
+`docker compose up` runs the whole stack without installing Python or Node. Production doesn't
+use Compose: Render builds `backend/` and Vercel builds `frontend/`, each pointed at its folder,
+and a change outside a service's folder doesn't redeploy it. The frontend's git history was
+brought in with `git subtree`, so no commits were lost in the merge.
+
 ## Known limitations
 
 - **History grows without limit.** Every call resends the conversation's full history,
@@ -92,22 +131,16 @@ following up on pull-request links. In production logs, a how-to question went s
 - **`/ask` has no authentication or rate limiting** — planned.
 - **No streaming** — answers arrive all at once. Planned.
 
-## Run locally
+## Backend only (without Docker)
 
 ```bash
+cd backend
 python -m venv venv && source venv/bin/activate
 pip install -r requirements.txt
 ```
 
-Create a `.env` file (no quotes around values — Docker's `--env-file` reads them literally):
-
-```
-ANTHROPIC_API_KEY=...
-OPENAI_API_KEY=...
-TAVILY_API_KEY=...
-```
-
-Start the API and open http://127.0.0.1:8000/docs:
+Create `backend/.env` as in Quick start, then start the API and open
+http://127.0.0.1:8000/docs:
 
 ```bash
 uvicorn main:app --reload
@@ -121,17 +154,17 @@ curl -X POST http://127.0.0.1:8000/ask \
   -d '{"question": "CircularProgress renders as a white square in dark mode", "conversation_id": "demo-1"}'
 ```
 
-With Docker:
+Backend container on its own (from the repo root):
 
 ```bash
-docker build -t mui-agent .
-docker run -p 8000:8000 --env-file .env mui-agent
+docker build -t mui-backend backend/
+docker run --rm -p 8000:8000 --env-file backend/.env mui-backend
 ```
 
 ### Rebuilding the issue index (optional)
 
-`chroma_db/` is committed, so this is only needed to refresh the data. Add `GITHUB_TOKEN` to
-`.env`, then:
+`backend/chroma_db/` is committed, so this is only needed to refresh the data. Add
+`GITHUB_TOKEN` to `backend/.env`, then from `backend/`:
 
 ```bash
 python ingest.py   # fetches issues + comments from GitHub → issues.json
@@ -141,20 +174,28 @@ python embed.py    # embeds every issue → chroma_db/  (201 paid embedding call
 
 ## Deployment
 
-Deployed on Render as a Docker web service, auto-deploying on every push to `main`.
-Three secrets are set as environment variables in Render (`ANTHROPIC_API_KEY`,
-`OPENAI_API_KEY`, `TAVILY_API_KEY`); none are in the image. `GET /` is a health check that
-Render polls before routing traffic to a new deploy.
+- **Backend → Render**, as a Docker web service with *Root Directory* `backend`, auto-deploying
+  on pushes to `main` that touch `backend/`. Three secrets are set as environment variables in
+  Render (`ANTHROPIC_API_KEY`, `OPENAI_API_KEY`, `TAVILY_API_KEY`); none are in the image.
+  `GET /` is a health check that Render polls before routing traffic to a new deploy.
+- **Frontend → Vercel**, with *Root Directory* `frontend`. Its only environment variable is
+  `BACKEND_URL`. Details in [frontend/README.md](frontend/README.md).
 
-## Files
+On both platforms a failed build doesn't replace the live deploy — the previous version keeps
+serving.
+
+## Files (backend)
 
 | File | Purpose |
 |---|---|
-| `main.py` | FastAPI app: `GET /` health check, `POST /ask` |
-| `agent.py` | Tools, tool schemas, and the Claude tool-use loop with per-conversation memory |
-| `embed_util.py` | Shared embedding function (build time and query time) |
-| `ingest.py` | Fetches issues and comments from the GitHub API |
-| `embed.py` | One-off build script: filters, embeds, and stores issues in Chroma |
-| `chroma_db/` | The committed vector index |
+| `backend/main.py` | FastAPI app: `GET /` health check, `POST /ask` |
+| `backend/agent.py` | Tools, tool schemas, and the Claude tool-use loop with per-conversation memory |
+| `backend/embed_util.py` | Shared embedding function (build time and query time) |
+| `backend/ingest.py` | Fetches issues and comments from the GitHub API |
+| `backend/embed.py` | One-off build script: filters, embeds, and stores issues in Chroma |
+| `backend/chroma_db/` | The committed vector index |
+| `backend/Dockerfile` | Python 3.11-slim image; dependencies installed before code for layer caching |
+| `docker-compose.yml` | Runs backend + frontend together on one network |
 
-**Stack:** Python · FastAPI · Anthropic Claude (tool use) · OpenAI embeddings · Chroma · Tavily · Docker · Render
+**Stack:** Python · FastAPI · Anthropic Claude (tool use) · OpenAI embeddings · Chroma · Tavily ·
+Next.js · Docker / Docker Compose · Render · Vercel
