@@ -1,6 +1,6 @@
 from fastapi import FastAPI
 from pydantic import BaseModel
-from agent import call_claude
+from agent import call_claude, get_previous_question, is_mui
 
 app = FastAPI()
 
@@ -17,7 +17,13 @@ def health_check():
 
 @app.post("/ask")
 def ask(body: Question):
+    previous = get_previous_question(body.conversation_id)
     question = body.question
-    conversation_id = body.conversation_id
-    response = call_claude(question, conversation_id)
-    return {"answer": response}
+    if not is_mui(question, previous):
+        return {
+            "answer": """I can only help with MUI (Material UI, MUI X, Joy UI) questions — bugs, errors, theming or styling. Try asking about a component that isn't behaving."""
+        }
+    else:
+        conversation_id = body.conversation_id
+        response = call_claude(question, conversation_id)
+        return {"answer": response}
