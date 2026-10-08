@@ -1,5 +1,6 @@
 import chromadb
 from click import prompt
+from constant import ALLOWED_WEB_DOMAINS, AGENT_SYSTEM_PROMPT
 from embed_util import embed_text
 from anthropic import Anthropic
 from dotenv import load_dotenv
@@ -24,7 +25,7 @@ def search_issues(query):
 
 
 def search_web(query):
-    web_result = tavily_client.search(query)
+    web_result = tavily_client.search(query, include_domains=ALLOWED_WEB_DOMAINS)
     return web_result
 
 
@@ -45,7 +46,7 @@ tools = [
     },
     {
         "name": "search_web",
-        "description": "Search the live web for current MUI documentation, "
+        "description": "Search the websites such as official MUI documentation and trusted developer sources (GitHub, Stack Overflow, MDN, React docs), not the open web. for current MUI documentation, "
         "recent fixes, or information not found in the local issues database. "
         "Use when the issue search returns nothing relevant, or when the resolution found is only a link to a pull request and "
         "needs more detail.",
@@ -119,6 +120,7 @@ def call_claude(query, conversation_id):
         model="claude-sonnet-4-5",
         max_tokens=1024,
         tools=tools,
+        system=AGENT_SYSTEM_PROMPT,
         messages=messages_list,
     )
     final_response = response
@@ -154,6 +156,7 @@ def call_claude(query, conversation_id):
             max_tokens=1024,
             tools=tools,
             messages=messages_list,
+            system=AGENT_SYSTEM_PROMPT,
         )
 
         tool_use_status = final_response.stop_reason
