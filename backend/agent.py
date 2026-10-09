@@ -1,7 +1,7 @@
 import chromadb
-from constant import ALLOWED_WEB_DOMAINS, AGENT_SYSTEM_PROMPT
+from constant import ALLOWED_WEB_DOMAINS, AGENT_SYSTEM_PROMPT, ALLOWED_MCP_TOOLS
 from embed_util import embed_text
-from anthropic import Anthropic
+from anthropic import AsyncAnthropic
 from dotenv import load_dotenv
 import json
 from tavily import TavilyClient
@@ -12,7 +12,7 @@ chroma_client = chromadb.PersistentClient(path="./chroma_db")
 
 collection = chroma_client.get_collection(name="MUIIssueDoc")
 
-claude_client = Anthropic()
+claude_client = AsyncAnthropic()
 
 tavily_client = TavilyClient()
 
@@ -26,6 +26,25 @@ def search_issues(query):
 def search_web(query):
     web_result = tavily_client.search(query, include_domains=ALLOWED_WEB_DOMAINS)
     return web_result
+
+
+def to_claude_tools(mcp_tools):
+    tool_list = [
+        {
+            "name": tool.name,
+            "description": tool.description,
+            "input_schema": tool.input_schema,
+        }
+        for tool in mcp_tools
+        if tool.name in ALLOWED_MCP_TOOLS
+    ]
+    return tool_list
+
+
+async def call_mcp_tool(mcp_session, name, args):
+    result = await mcp_session.call_tools(name, args)
+    text = "\n".join(c.text for c in result.content if c.type == "text")
+    return text[:20000]
 
 
 tools = [
@@ -90,14 +109,14 @@ If a previous question is given, the new message is in scope if it is a reasonab
 Respond with exactly one word: TRUE if in scope, FALSE if not."""
 
 
-def is_mui(query, previous_question=None):
+async def is_mui(query, previous_question=None):
     final_query = (
         f"Previous question: {previous_question}\nNew message: {query}"
         if previous_question
         else query
     )
     try:
-        response = claude_client.messages.create(
+        response = await claude_client.messages.create(
             model="claude-haiku-4-5",
             max_tokens=5,
             system=GUARD_SYSTEM_PROMPT,
@@ -110,15 +129,16 @@ def is_mui(query, previous_question=None):
         return False
 
 
-def call_claude(query, conversation_id):
+async def call_claude(query, conversation_id, mcp_session, mcp_tools):
+    all_tools = tools + mcp_tools
     if conversation_id not in histories:
         histories[conversation_id] = []
     messages_list = histories[conversation_id]
     messages_list.append({"role": "user", "content": query})
-    response = claude_client.messages.create(
+    response = await claude_client.messages.create(
         model="claude-sonnet-4-5",
         max_tokens=1024,
-        tools=tools,
+        tools=all_tools,
         system=AGENT_SYSTEM_PROMPT,
         messages=messages_list,
     )
@@ -130,11 +150,17 @@ def call_claude(query, conversation_id):
         for block in final_response.content:
             if block.type == "tool_use":
                 print("TOOL CALLED:", block.name, "|", block.input)
-                tools_to_call = required_tools[block.name]
-                response_data = tools_to_call(**block.input)
-                tool_response.append(
-                    {"id": block.id, "result": json.dumps(response_data)}
-                )
+                if block.name in required_tools:
+                    tools_to_call = required_tools[block.name]
+                    response_data = tools_to_call(**block.input)
+                    tool_response.append(
+                        {"id": block.id, "result": json.dumps(response_data)}
+                    )
+                else:
+                    response_data = await call_mcp_tool(
+                        mcp_session, block.name, block.input
+                    )
+                    tool_response.append({"id": block.id, "result": response_data})
         messages_list.append({"role": "assistant", "content": final_response.content})
 
         content = []
@@ -150,10 +176,10 @@ def call_claude(query, conversation_id):
 
         messages_list.append({"role": "user", "content": content})
 
-        final_response = claude_client.messages.create(
+        final_response = await claude_client.messages.create(
             model="claude-sonnet-4-5",
             max_tokens=1024,
-            tools=tools,
+            tools=all_tools,
             messages=messages_list,
             system=AGENT_SYSTEM_PROMPT,
         )
