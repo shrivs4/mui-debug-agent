@@ -1,5 +1,4 @@
 import chromadb
-from click import prompt
 from constant import ALLOWED_WEB_DOMAINS, AGENT_SYSTEM_PROMPT
 from embed_util import embed_text
 from anthropic import Anthropic
