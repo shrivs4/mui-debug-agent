@@ -1,10 +1,17 @@
 import chromadb
-from constant import ALLOWED_WEB_DOMAINS, AGENT_SYSTEM_PROMPT, ALLOWED_MCP_TOOLS
+from constant import (
+    ALLOWED_DOC_SUFFIXES,
+    ALLOWED_WEB_DOMAINS,
+    AGENT_SYSTEM_PROMPT,
+    ALLOWED_MCP_TOOLS,
+    ALLOWED_DOC_HOSTS,
+)
 from embed_util import embed_text
 from anthropic import AsyncAnthropic
 from dotenv import load_dotenv
 import json
 from tavily import TavilyClient
+from urllib.parse import urlparse
 
 load_dotenv()
 
@@ -15,6 +22,15 @@ collection = chroma_client.get_collection(name="MUIIssueDoc")
 claude_client = AsyncAnthropic()
 
 tavily_client = TavilyClient()
+
+
+def is_allowed_doc_url(url):
+    host_name = urlparse(url).hostname
+    if not host_name:
+        return False
+    return host_name in ALLOWED_DOC_HOSTS or any(
+        host_name.endswith(s) for s in ALLOWED_DOC_SUFFIXES
+    )
 
 
 def search_issues(query):
@@ -42,9 +58,18 @@ def to_claude_tools(mcp_tools):
 
 
 async def call_mcp_tool(mcp_session, name, args):
-    result = await mcp_session.call_tools(name, args)
-    text = "\n".join(c.text for c in result.content if c.type == "text")
-    return text[:20000]
+    if name == "fetchDocs":
+        urls = args.get("urls", [])
+        if not all(is_allowed_doc_url(u) for u in urls):
+            print(f"Blocked fetchDocs URLs: {urls}")
+            return "Error: fetchDocs only allows official MUI documentation URLs."
+    try:
+        result = await mcp_session.call_tool(name, args)
+        text = "\n".join(c.text for c in result.content if c.type == "text")
+        return text[:20000]
+    except Exception as e:
+        print(f"MCP tool {name} failed: {e}")
+        return f"Error: the {name} tool failed. Answer without it or try another tool."
 
 
 tools = [

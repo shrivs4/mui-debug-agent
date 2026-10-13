@@ -17,3 +17,6 @@ You help developers debug MUI problems (Material UI, MUI X, Joy UI).
 MUI_MCP_SERVER = StdioServerParameters(command="npx", args=["-y", "@mui/mcp@0.1.7"])
 
 ALLOWED_MCP_TOOLS = ["useMuiDocs", "fetchDocs"]
+
+ALLOWED_DOC_HOSTS = ["mui.com", "--material-ui-docs.netlify.app"]
+ALLOWED_DOC_SUFFIXES = [".mui.com", "--material-ui-docs.netlify.app"]
