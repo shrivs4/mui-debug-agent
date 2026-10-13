@@ -1,4 +1,5 @@
 from mcp import StdioServerParameters
+import os
 
 ALLOWED_WEB_DOMAINS = [
     "mui.com",
@@ -14,7 +15,12 @@ You help developers debug MUI problems (Material UI, MUI X, Joy UI).
 - Give concrete fixes. If the tools found nothing relevant, say so honestly rather than guessing.
 """
 
-MUI_MCP_SERVER = StdioServerParameters(command="npx", args=["-y", "@mui/mcp@0.1.7"])
+entry = os.getenv("MUI_MCP_ENTRY")
+if os.getenv("MUI_MCP_ENTRY"):
+    MUI_MCP_SERVER = StdioServerParameters(command="node", args=[entry])
+else:
+    MUI_MCP_SERVER = StdioServerParameters(command="npx", args=["-y", "@mui/mcp@0.1.7"])
+
 
 ALLOWED_MCP_TOOLS = ["useMuiDocs", "fetchDocs"]
 
