@@ -1,4 +1,4 @@
-from fastapi import FastAPI, Request
+from fastapi import FastAPI, Request, HTTPException
 from pydantic import BaseModel
 from agent import call_claude, get_previous_question, is_mui, to_claude_tools
 from contextlib import asynccontextmanager
@@ -6,6 +6,8 @@ import asyncio
 from mcp import ClientSession
 from mcp.client.stdio import stdio_client
 from constant import MUI_MCP_SERVER
+import os
+import secrets
 
 
 @asynccontextmanager
@@ -31,6 +33,8 @@ async def lifespan(app):
 
 app = FastAPI(lifespan=lifespan)
 
+permission_key = os.getenv("BACKEND_API_KEY")
+
 
 class Question(BaseModel):
     question: str
@@ -44,6 +48,9 @@ def health_check():
 
 @app.post("/ask")
 async def ask(body: Question, request: Request):
+    sent_key = request.headers.get("X-API-Key")
+    if not permission_key or not secrets.compare_digest(sent_key or "", permission_key):
+        raise HTTPException(status_code=401, detail="Unauthorized")
     previous = get_previous_question(body.conversation_id)
     question = body.question
     if not await is_mui(question, previous):
