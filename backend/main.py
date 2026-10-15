@@ -8,6 +8,7 @@ from mcp.client.stdio import stdio_client
 from constant import MUI_MCP_SERVER
 import os
 import secrets
+import time
 
 
 @asynccontextmanager
@@ -41,6 +42,25 @@ class Question(BaseModel):
     conversation_id: str
 
 
+request_times = {}
+LIMIT = 10
+WINDOW_SECONDS = 60
+
+
+def is_rate_limited(ip: str):
+    now = time.time()
+
+    recent = [t for t in request_times.get(ip, []) if now - t < WINDOW_SECONDS]
+
+    if len(recent) >= LIMIT:
+        request_times[ip] = recent
+        return True
+
+    recent.append(now)
+    request_times[ip] = recent
+    return False
+
+
 @app.get("/")
 def health_check():
     return {"status": "ok"}
@@ -49,8 +69,11 @@ def health_check():
 @app.post("/ask")
 async def ask(body: Question, request: Request):
     sent_key = request.headers.get("X-API-Key")
+    client_ip = request.headers.get("X-Client-IP", "unknown")
     if not permission_key or not secrets.compare_digest(sent_key or "", permission_key):
         raise HTTPException(status_code=401, detail="Unauthorized")
+    if is_rate_limited(client_ip):
+        raise HTTPException(status_code=429, detail="Too Many Requests")
     previous = get_previous_question(body.conversation_id)
     question = body.question
     if not await is_mui(question, previous):
