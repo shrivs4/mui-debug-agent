@@ -155,6 +155,7 @@ async def is_mui(query, previous_question=None):
 
 
 async def call_claude(query, conversation_id, mcp_session, mcp_tools):
+    tools_used = []
     all_tools = tools + mcp_tools
     if conversation_id not in histories:
         histories[conversation_id] = []
@@ -175,6 +176,7 @@ async def call_claude(query, conversation_id, mcp_session, mcp_tools):
         for block in final_response.content:
             if block.type == "tool_use":
                 print("TOOL CALLED:", block.name, "|", block.input)
+                tools_used.append(block.name)
                 if block.name in required_tools:
                     tools_to_call = required_tools[block.name]
                     response_data = tools_to_call(**block.input)
@@ -212,4 +214,4 @@ async def call_claude(query, conversation_id, mcp_session, mcp_tools):
         tool_use_status = final_response.stop_reason
         attempt += 1
     messages_list.append({"role": "assistant", "content": final_response.content})
-    return final_response.content[0].text
+    return final_response.content[0].text, tools_used
