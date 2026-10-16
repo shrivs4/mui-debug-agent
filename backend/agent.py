@@ -1,5 +1,3 @@
-from unittest import result
-
 import chromadb
 from constant import (
     ALLOWED_DOC_SUFFIXES,
