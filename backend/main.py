@@ -1,5 +1,5 @@
 from multiprocessing.connection import answer_challenge
-
+from fastapi.responses import StreamingResponse
 from fastapi import FastAPI, Request, HTTPException
 from pydantic import BaseModel
 from agent import call_claude, get_previous_question, is_mui, to_claude_tools
@@ -90,13 +90,19 @@ async def ask(body: Question, request: Request):
     if not permission_key or not secrets.compare_digest(sent_key or "", permission_key):
         log_request(status="unauthorized", latency_ms=ms())
         raise HTTPException(status_code=401, detail="Unauthorized")
+
     if is_rate_limited(client_ip):
         log_request(
             status="rate_limited", conversation_id=body.conversation_id, latency_ms=ms()
         )
         raise HTTPException(status_code=429, detail="Too Many Requests")
+
     previous = get_previous_question(body.conversation_id)
     question = body.question
+
+    def line(event):  # one NDJSON line
+        return json.dumps(event) + "\n"
+
     if not await is_mui(question, previous):
         log_request(
             status="refused",
@@ -104,23 +110,50 @@ async def ask(body: Question, request: Request):
             question=question[:100],
             latency_ms=ms(),
         )
-        return {
-            "answer": """I can only help with MUI (Material UI, MUI X, Joy UI) questions — bugs, errors, theming or styling. Try asking about a component that isn't behaving."""
-        }
-    else:
-        conversation_id = body.conversation_id
-        response, tool_used = await call_claude(
-            question,
-            conversation_id,
-            request.app.state.mcp_session,
-            request.app.state.mcp_tools,
-        )
-        log_request(
-            status="ok",
-            conversation_id=body.conversation_id,
-            question=question[:100],
-            tools=tool_used,
-            answer_chars=len(response),
-            latency_ms=ms(),
-        )
-        return {"answer": response}
+
+        async def refusal():
+            yield line(
+                {
+                    "type": "text",
+                    "delta": "I can only help with MUI (Material UI, MUI X, Joy UI) questions — bugs, errors, theming or styling. Try asking about a component that isn't behaving.",
+                }
+            )
+            yield line({"type": "done"})
+
+        return StreamingResponse(refusal(), media_type="application/x-ndjson")
+
+    async def event_stream():
+        tools_used = []
+        answer_chars = 0
+        try:
+            async for event in call_claude(
+                question,
+                body.conversation_id,
+                request.app.state.mcp_session,
+                request.app.state.mcp_tools,
+                tools_used,
+            ):
+                if event["type"] == "text":
+                    answer_chars += len(event["delta"])
+                yield line(event)
+            yield line({"type": "done"})
+            log_request(
+                status="ok",
+                conversation_id=body.conversation_id,
+                question=question[:100],
+                tools=tools_used,
+                answer_chars=answer_chars,
+                latency_ms=ms(),
+            )
+        except Exception as e:
+            log_request(
+                status="error",
+                conversation_id=body.conversation_id,
+                error=str(e)[:200],
+                latency_ms=ms(),
+            )
+            yield line(
+                {"type": "error", "message": "Something went wrong. Please try again."}
+            )
+
+    return StreamingResponse(event_stream(), media_type="application/x-ndjson")
