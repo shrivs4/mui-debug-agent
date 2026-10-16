@@ -7,7 +7,7 @@ import { TypingIndicator } from '@/components/TypingIndicator';
 import { EmptyState } from '@/components/EmptyState';
 
 export default function Home() {
-  const { messages, isLoading, isSlow, sendMessage, newChat, retry } = useChat();
+  const { messages, isLoading, isSlow, isWaiting, status, streamingId, sendMessage, newChat, retry } = useChat();
   const [input, setInput] = useState('');
   const threadRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -57,9 +57,14 @@ export default function Home() {
         ) : (
           <div className="mx-auto flex max-w-2xl flex-col gap-4 px-4 py-6">
             {messages.map((msg) => (
-              <ChatMessage key={msg.id} message={msg} onRetry={retry} />
+              <ChatMessage
+                key={msg.id}
+                message={msg}
+                onRetry={retry}
+                isStreaming={msg.id === streamingId}
+              />
             ))}
-            {isLoading && <TypingIndicator isSlow={isSlow} />}
+            {isWaiting && <TypingIndicator isSlow={isSlow} status={status} />}
           </div>
         )}
       </div>

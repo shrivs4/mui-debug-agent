@@ -1,13 +1,21 @@
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import type { Message } from '@/hooks/useChat';
+import { useSmoothText } from '@/hooks/useSmoothText';
 
 type Props = {
   message: Message;
   onRetry: (question: string) => void;
+  isStreaming?: boolean;
 };
 
-export function ChatMessage({ message, onRetry }: Props) {
+export function ChatMessage({ message, onRetry, isStreaming = false }: Props) {
+  // Hook is always called; smoothing is only active for the live assistant message.
+  const smoothContent = useSmoothText(
+    message.content,
+    isStreaming && message.role === 'assistant'
+  );
+
   if (message.role === 'user') {
     return (
       <div className="flex justify-end">
@@ -41,7 +49,7 @@ export function ChatMessage({ message, onRetry }: Props) {
       <div className="max-w-[75%] rounded-2xl rounded-tl-sm bg-gray-100 px-4 py-2.5 dark:bg-gray-800">
         <div className="prose prose-sm max-w-none dark:prose-invert">
           <ReactMarkdown remarkPlugins={[remarkGfm]}>
-            {message.content}
+            {smoothContent}
           </ReactMarkdown>
         </div>
       </div>
