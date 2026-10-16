@@ -19,6 +19,7 @@ export async function POST(req: Request) {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'X-API-Key': permissionKey, 'X-Client-IP': incomingIP },
       body: JSON.stringify({ question, conversation_id }),
+      signal: req.signal
     });
 
     if (!res.ok) {
@@ -26,8 +27,11 @@ export async function POST(req: Request) {
       return Response.json({ error: text || 'Backend returned an error' }, { status: res.status });
     }
 
-    const data = await res.json();
-    return Response.json(data);
+    return new Response(res.body,{
+      headers: {
+        'Content-Type': 'application/x-ndjson'
+      }
+    })
   } catch {
     return Response.json({ error: 'Backend unreachable' }, { status: 502 });
   }

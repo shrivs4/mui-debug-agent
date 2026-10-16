@@ -26,3 +26,10 @@ ALLOWED_MCP_TOOLS = ["useMuiDocs", "fetchDocs"]
 
 ALLOWED_DOC_HOSTS = ["mui.com", "--material-ui-docs.netlify.app"]
 ALLOWED_DOC_SUFFIXES = [".mui.com", "--material-ui-docs.netlify.app"]
+
+TOOL_STATUS = {
+    "search_issues": "Searching past MUI issues…",
+    "search_web": "Searching trusted sites…",
+    "useMuiDocs": "Finding the right MUI docs for your version…",
+    "fetchDocs": "Reading the MUI docs…",
+}

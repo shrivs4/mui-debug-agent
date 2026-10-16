@@ -5,6 +5,7 @@ from constant import (
     AGENT_SYSTEM_PROMPT,
     ALLOWED_MCP_TOOLS,
     ALLOWED_DOC_HOSTS,
+    TOOL_STATUS,
 )
 from embed_util import embed_text
 from anthropic import AsyncAnthropic
@@ -154,64 +155,46 @@ async def is_mui(query, previous_question=None):
         return False
 
 
-async def call_claude(query, conversation_id, mcp_session, mcp_tools):
-    tools_used = []
+async def call_claude(query, conversation_id, mcp_session, mcp_tools, tools_used):
     all_tools = tools + mcp_tools
     if conversation_id not in histories:
         histories[conversation_id] = []
     messages_list = histories[conversation_id]
     messages_list.append({"role": "user", "content": query})
-    response = await claude_client.messages.create(
-        model="claude-sonnet-4-5",
-        max_tokens=1024,
-        tools=all_tools,
-        system=AGENT_SYSTEM_PROMPT,
-        messages=messages_list,
-    )
-    final_response = response
-    tool_use_status = response.stop_reason
-    attempt = 0
-    while tool_use_status == "tool_use" and attempt < 10:
-        tool_response = []
-        for block in final_response.content:
-            if block.type == "tool_use":
-                print("TOOL CALLED:", block.name, "|", block.input)
-                tools_used.append(block.name)
-                if block.name in required_tools:
-                    tools_to_call = required_tools[block.name]
-                    response_data = tools_to_call(**block.input)
-                    tool_response.append(
-                        {"id": block.id, "result": json.dumps(response_data)}
-                    )
-                else:
-                    response_data = await call_mcp_tool(
-                        mcp_session, block.name, block.input
-                    )
-                    tool_response.append({"id": block.id, "result": response_data})
-        messages_list.append({"role": "assistant", "content": final_response.content})
 
-        content = []
-
-        for result in tool_response:
-            content.append(
-                {
-                    "type": "tool_result",
-                    "tool_use_id": result["id"],
-                    "content": result["result"],
-                }
-            )
-
-        messages_list.append({"role": "user", "content": content})
-
-        final_response = await claude_client.messages.create(
+    for attempt in range(10):
+        async with claude_client.messages.stream(
             model="claude-sonnet-4-5",
             max_tokens=1024,
             tools=all_tools,
-            messages=messages_list,
             system=AGENT_SYSTEM_PROMPT,
-        )
+            messages=messages_list,
+        ) as stream:
+            async for text in stream.text_stream:
+                yield {"type": "text", "delta": text}
+            final = await stream.get_final_message()
 
-        tool_use_status = final_response.stop_reason
-        attempt += 1
-    messages_list.append({"role": "assistant", "content": final_response.content})
-    return final_response.content[0].text, tools_used
+        messages_list.append({"role": "assistant", "content": final.content})
+
+        if final.stop_reason != "tool_use":
+            return
+
+        tool_result = []
+        for block in final.content:
+            if block.type == "tool_use":
+                print("TOOL CALLED:", block.name, "|", block.input)
+                tools_used.append(block.name)
+                yield {
+                    "type": "status",
+                    "message": TOOL_STATUS.get(block.name, "Working…"),
+                }
+
+                if block.name in required_tools:
+                    result = json.dumps(required_tools[block.name](**block.input))
+                else:
+                    result = await call_mcp_tool(mcp_session, block.name, block.input)
+
+                tool_result.append(
+                    {"type": "tool_result", "tool_use_id": block.id, "content": result}
+                )
+        messages_list.append({"role": "user", "content": tool_result})
