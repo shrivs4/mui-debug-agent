@@ -25,7 +25,7 @@ embeddings = []
 
 for issue in filter_issue:
     comments = "\n".join(issue["response_comment"])
-    blob = issue["title"] + "\n" + issue["body"] + "\n" + comments
+    blob = issue["title"] + "\n" + (issue["body"] or "") + "\n" + comments
     blob = blob[:8000]
     ids.append(str(issue["number"]))
     documents.append(blob)
