@@ -1,0 +1,47 @@
+name: Weekly re-embed
+
+on:
+  schedule:
+    - cron: "0 3 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  re-embed:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        working-directory: backend
+        run: pip install -r requirements.txt
+      
+      - name: Fetch issues
+        working-directory: backend
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: python ingest.py
+
+      - name: Embed issues
+        working-directory: backend
+        env:
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+        run: python embed.py
+
+      - name: Commit if data changed
+        run: | 
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add -A backend/chroma_db backend/issues.json
+          if git diff --staged --quiet; then
+            echo "No changes"
+          else
+            git commit -m "Weekly re-embed"
+            git push
+          fi
