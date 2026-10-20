@@ -1,10 +1,16 @@
 import json
 from embed_util import embed_text
 import chromadb
+from chromadb.errors import NotFoundError
 
 chroma_client = chromadb.PersistentClient(path="./chroma_db")
 
-collection = chroma_client.get_or_create_collection(name="MUIIssueDoc")
+try:
+    chroma_client.delete_collection(name="MUIIssueDoc")
+except NotFoundError:
+    pass  # first run: nothing to delete yet
+
+collection = chroma_client.create_collection(name="MUIIssueDoc")
 
 issue_data = []
 
