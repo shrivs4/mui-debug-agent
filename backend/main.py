@@ -12,7 +12,7 @@ import secrets
 import time
 import json
 import logging
-from langfuse import observe
+from langfuse import observe, get_client
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("mui-agent")
@@ -40,6 +40,7 @@ async def lifespan(app):
             app.state.mcp_tools = to_claude_tools(result.tools)
             print("Tools from Claude:", [t["name"] for t in app.state.mcp_tools])
             yield
+            get_client().flush()
     print("MCP connection closed")
 
 
