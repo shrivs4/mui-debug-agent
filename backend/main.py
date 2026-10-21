@@ -12,6 +12,7 @@ import secrets
 import time
 import json
 import logging
+from langfuse import observe
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("mui-agent")
@@ -77,6 +78,7 @@ def health_check():
 
 
 @app.post("/ask")
+@observe()
 async def ask(body: Question, request: Request):
     start = time.perf_counter()
 

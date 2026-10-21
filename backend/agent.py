@@ -13,6 +13,10 @@ from dotenv import load_dotenv
 import json
 from tavily import TavilyClient
 from urllib.parse import urlparse
+from opentelemetry.instrumentation.anthropic import AnthropicInstrumentor
+from langfuse import observe
+
+AnthropicInstrumentor().instrument()
 
 load_dotenv()
 
@@ -34,12 +38,14 @@ def is_allowed_doc_url(url):
     )
 
 
+@observe(as_type="tool")
 def search_issues(query):
     embeded_query = embed_text(query)
     result = collection.query(query_embeddings=[embeded_query], n_results=3)
     return result
 
 
+@observe(as_type="tool")
 def search_web(query):
     web_result = tavily_client.search(query, include_domains=ALLOWED_WEB_DOMAINS)
     return web_result
@@ -58,6 +64,7 @@ def to_claude_tools(mcp_tools):
     return tool_list
 
 
+@observe(as_type="tool")
 async def call_mcp_tool(mcp_session, name, args):
     if name == "fetchDocs":
         urls = args.get("urls", [])
