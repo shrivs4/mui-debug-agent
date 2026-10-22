@@ -1,0 +1,106 @@
+[
+  {
+    "question": "When I press the left arrow key in an Autocomplete field that hasn't had a value selected yet, the application crashes with an error about not being able to access the \"focus\" property. Why is this happening?",
+    "expected_id": "47212"
+  },
+  {
+    "question": "Why is my modal dialog not showing up in accessibility tests after reopening it, and why is the parent container getting marked as hidden?",
+    "expected_id": "48882"
+  },
+  {
+    "question": "Why am I getting a React missing key warning in my Autocomplete component even though I'm already setting a key prop on the rendered list items?",
+    "expected_id": "46997"
+  },
+  {
+    "question": "Why do I keep ending up on the old documentation site when I click on JoyUI links, and how do I get back to the current version?",
+    "expected_id": "48249"
+  },
+  {
+    "question": "When I search for the luggage icon and select the outlined style, it still shows the filled version. Also, when I click on it to open the details, I can't close the popup no matter what I try.",
+    "expected_id": "48337"
+  },
+  {
+    "question": "Why does my TypeScript language server keep crashing in VS Code after I install the latest Material Icons package for MUI, and how can I fix it?",
+    "expected_id": "48364"
+  },
+  {
+    "question": "Why doesn't the TextField component add the aria-required attribute to the input element when I mark it as required, and how can I make screen readers properly announce that a field is mandatory?",
+    "expected_id": "48742"
+  },
+  {
+    "question": "I'm getting a crash that says \"Cannot read properties of null (reading 'removeAttribute')\" when I use an Autocomplete component with a custom option renderer inside React.StrictMode, and it happens randomly when I interact with the dropdown.",
+    "expected_id": "48908"
+  },
+  {
+    "question": "Why am I getting a 404 error when I try to click on the example projects link in the MUI documentation?",
+    "expected_id": "47144"
+  },
+  {
+    "question": "Why can't I type or interact with input fields that are inside a shadow DOM when they're wrapped in a Modal component, and the focus seems to disappear immediately after I click on them?",
+    "expected_id": "47423"
+  },
+  {
+    "question": "When I click on the label or the area around a text input that already has text in it, the cursor jumps to the beginning of the text instead of staying where I click. How do I fix this?",
+    "expected_id": "47336"
+  },
+  {
+    "question": "Why does my Next.js app with Material-UI always show light mode when I set my browser to follow the system appearance setting, even though my OS is in dark mode?",
+    "expected_id": "47631"
+  },
+  {
+    "question": "I'm getting \"TypeError: nodeToRestore.current.focus is not a function\" when I close a Dialog or Modal component in my tests, and it started happening after I upgraded jsdom. How do I fix this?",
+    "expected_id": "49159"
+  },
+  {
+    "question": "I'm getting a \"focus is not a function\" error when my Dialog or Menu unmounts, and it seems to be coming from the FocusTrap component. Why is this happening and how do I fix it?",
+    "expected_id": "49181"
+  },
+  {
+    "question": "Why does the dropdown list look flatter and less prominent when I use Autocomplete compared to when I use Select, even though they're showing the same type of menu?",
+    "expected_id": "48933"
+  },
+  {
+    "question": "Why is the asterisk disappearing when my text input label is too long and gets cut off with dots?",
+    "expected_id": "48388"
+  },
+  {
+    "question": "When I click on a custom rendered value in my Autocomplete component, the dropdown menu doesn't open like it does when I click on custom rendered tags. Instead, it seems to treat the click like I'm adding multiple selections. How do I fix this?",
+    "expected_id": "48361"
+  },
+  {
+    "question": "Why is my TextField showing the wrong dimensions when I override the default size prop on OutlinedInput?",
+    "expected_id": "47495"
+  },
+  {
+    "question": "Why does the CircularProgress component show a strange visual artifact or glitch around its border when first rendered inside a Modal, and why does it disappear after a few seconds?",
+    "expected_id": "47318"
+  },
+  {
+    "question": "Why are custom props I added to my Material-UI Button component showing up as HTML attributes on the rendered DOM element?",
+    "expected_id": "46972"
+  },
+  {
+    "question": "I'm trying to add a loading spinner inside a TextField using the endAdornment prop, but it's not showing up. What am I doing wrong?",
+    "expected_id": "47412"
+  },
+  {
+    "question": "When I select an item from an autocomplete dropdown with multiple selections enabled, the list jumps back to the beginning instead of staying where I was scrolling. Why does this happen?",
+    "expected_id": "47203"
+  },
+  {
+    "question": "When I resize my browser window while a Select dropdown is open, the menu stays at its original size instead of adjusting to match the Select component's new width. How do I fix this?",
+    "expected_id": "47035"
+  },
+  {
+    "question": "Why am I getting an error when I try to import the InfoOutline icon from @mui/icons-material using the path shown in the documentation?",
+    "expected_id": "47637"
+  },
+  {
+    "question": "How can I access the current input value and validation details in the onBlur callback of an Autocomplete component, similar to what I get in onChange?",
+    "expected_id": "47591"
+  },
+  {
+    "question": "Why isn't my keyboard input being detected when I focus on a Select component after closing its dropdown menu?",
+    "expected_id": "47346"
+  }
+]
