@@ -64,7 +64,7 @@ def to_claude_tools(mcp_tools):
     return tool_list
 
 
-@observe(as_type="tool")
+@observe(as_type="tool", capture_input=False)
 async def call_mcp_tool(mcp_session, name, args):
     if name == "fetchDocs":
         urls = args.get("urls", [])
@@ -172,7 +172,7 @@ async def call_claude(query, conversation_id, mcp_session, mcp_tools, tools_used
     for attempt in range(10):
         async with claude_client.messages.stream(
             model="claude-sonnet-4-5",
-            max_tokens=1024,
+            max_tokens=2048,
             tools=all_tools,
             system=AGENT_SYSTEM_PROMPT,
             messages=messages_list,
