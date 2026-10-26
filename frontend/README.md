@@ -16,8 +16,10 @@ Browser → /api/ask (Next.js route, server-side) → FastAPI backend → Claude
 ```
 
 The browser never calls the backend directly. The Next.js route handler forwards each request
-server-side, so there's no CORS setup, the backend URL stays out of the client bundle, and there
-is one place to add auth or rate limiting later.
+server-side, so there's no CORS setup and the backend URL and API key stay out of the client
+bundle. The route adds the shared `X-API-Key`, forwards the user's real IP as `X-Client-IP`
+(for the backend's rate limit), forwards the browser's abort signal, and passes the backend's
+NDJSON stream straight through instead of waiting for the whole body.
 
 ## Frontend decisions
 
@@ -27,17 +29,24 @@ is one place to add auth or rate limiting later.
 - **Built for a slow backend.** The backend runs on Render's free tier (30–50 s cold start) and
   the agent makes tool calls, so the route allows up to 60 s (`maxDuration`), and after 8 s the
   UI tells the user the server is waking up.
+- **Streaming.** `useChat` reads the response with `getReader()` + `TextDecoder` and buffers
+  it, because network chunks aren't lines: only complete NDJSON lines are parsed, and the last
+  partial line waits for the next chunk. `status` events show in the typing indicator while
+  tools run; the assistant bubble appears on the first `text` event and is updated by id with
+  functional state updates (deltas arrive faster than React re-renders).
+- **Smooth reveal.** `useSmoothText` reveals streamed text with `requestAnimationFrame` at an
+  adaptive pace, so bursts don't look jumpy; it respects `prefers-reduced-motion`.
 - **No stale answers after New chat.** Clicking New chat aborts the in-flight request
-  (`AbortController`) and ignores its response, so an old answer can't land in the new thread.
-  (Aborting only cancels the browser side — the backend still finishes and writes to the old,
-  now-unused conversation.)
+  (`AbortController`). The route forwards the abort, so the backend stops the agent and closes
+  the Claude stream as well.
 - **Errors are visible and retryable.** Failures show in the thread with a Retry button that
   re-sends without duplicating the user's message. If the platform returns a non-JSON timeout
   page, the UI says the server took too long rather than showing a generic network error.
-- **Fails loudly when misconfigured.** If `BACKEND_URL` is missing, the route returns a clear
-  500 ("BACKEND_URL is not configured") instead of guessing a URL.
-- **All request logic lives in one hook** (`hooks/useChat.ts`), so streaming can be added
-  later without touching the components.
+- **Fails loudly when misconfigured.** If `BACKEND_URL` or `BACKEND_API_KEY` is missing, the
+  route returns a clear 500 instead of guessing.
+- **All request logic lives in one hook** (`hooks/useChat.ts`) — which is why streaming could be
+  added later without touching the components. It still accepts the old JSON response, so the
+  frontend can be deployed before the backend.
 
 ## Run locally
 
@@ -50,6 +59,7 @@ is one place to add auth or rate limiting later.
 cd frontend
 npm install
 echo "BACKEND_URL=http://localhost:8000" > .env.local
+echo "BACKEND_API_KEY=<same value as in backend/.env>" >> .env.local
 npm run dev
 ```
 
@@ -83,18 +93,20 @@ Build tools and source code never reach the runtime image. `.dockerignore` keeps
 
 Deployed on Vercel from this monorepo with *Root Directory* set to `frontend`. Vercel builds
 Next.js its own way, so the Dockerfile and `output: "standalone"` don't affect it. The only
-environment variable is `BACKEND_URL` (server-side; no `NEXT_PUBLIC_` prefix, so it never
-reaches the browser).
+environment variables are `BACKEND_URL` and `BACKEND_API_KEY` — both server-side. Neither has
+the `NEXT_PUBLIC_` prefix: Next.js inlines `NEXT_PUBLIC_*` variables into the browser bundle at
+build time, so the prefix is what decides who can see a variable.
 
 ## Files
 
 | File | Purpose |
 |---|---|
 | `app/api/ask/route.ts` | Server-side proxy to the backend's `POST /ask` |
-| `hooks/useChat.ts` | Messages, loading state, conversation id, send / retry / new chat |
+| `hooks/useChat.ts` | Messages, streaming NDJSON reader, status, conversation id, send / retry / new chat |
+| `hooks/useSmoothText.ts` | Adaptive-speed reveal of streamed text |
 | `app/page.tsx` | Chat page: header, thread, input |
 | `components/ChatMessage.tsx` | User, assistant (Markdown) and error messages |
-| `components/TypingIndicator.tsx` | Typing dots and the "waking the server" notice |
+| `components/TypingIndicator.tsx` | Typing dots, the agent's current status, and the "waking the server" notice |
 | `components/EmptyState.tsx` | Clickable example questions |
 | `Dockerfile` / `.dockerignore` | Multi-stage production image for local and Compose use |
 
