@@ -2,7 +2,7 @@ name: Weekly re-embed
 
 on:
   schedule:
-    - cron: "0 3 * * 1"
+    - cron: "17 3 * * 1"  # off the top of the hour: GitHub drops/delays scheduled runs at :00 under load
   workflow_dispatch:
 
 permissions:
